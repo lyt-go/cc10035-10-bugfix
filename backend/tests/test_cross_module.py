@@ -353,8 +353,11 @@ class TestCrossModuleService:
         assert isinstance(result, list)
 
     def test_decode_and_route(self):
-        result = cross_service.decode_and_route("temp=25,humidity=60,pressure=1013", "报文解码样例3", "消息路由样例3")
+        # 报文解码样例3 是已启用的 int32/小端规则，FEFFFFFF 必须按有符号解成 -2。
+        result = cross_service.decode_and_route("FEFFFFFF", "报文解码样例3", "消息路由样例3")
         assert result["ok"] is True
+        assert result["result"]["parsed_value"] == -2
+        assert result["result"]["target_topic"] == "iot/telemetry/temp"
 
     def test_configure_point_with_store(self):
         result = cross_service.configure_point_with_store("NEW-PT-01", "DEVI-0001", "温度测点", "tsdb")

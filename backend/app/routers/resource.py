@@ -91,6 +91,17 @@ def create_entry(module: str, payload: EntryPayload) -> ActionResult:
     return ActionResult(ok=True, message=f"{service.ENTITY}已登记", entry=entry)
 
 
+@router.patch("/{module}/{entry_id}", response_model=ActionResult)
+def update_entry(module: str, entry_id: int, payload: EntryPayload) -> ActionResult:
+    """修改一条记录；解码规则会借这次修改推进解析版本。"""
+    service = require_service(module)
+    updater = getattr(service, "update_entry", None)
+    if updater is None:
+        raise HTTPException(status_code=405, detail=f"{service.ENTITY}不支持修改")
+    entry, message = updater(entry_id, payload.values)
+    return ActionResult(ok=entry is not None, message=message, entry=entry)
+
+
 @router.post("/{module}/{entry_id}/actions", response_model=ActionResult)
 def run_action(module: str, entry_id: int, payload: ActionPayload) -> ActionResult:
     service = require_service(module)

@@ -14,12 +14,26 @@ class Store:
         self._tables: dict[str, list[dict[str, Any]]] = {
             name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
         }
+        # 送测凭据、路由回执等运行期流水不进入业务模块清单，
+        # 但同样保存在内存仓库里，重启前的多次请求看到的是同一份数据。
+        self._records: dict[str, list[dict[str, Any]]] = {}
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)
 
     def rows(self, module: str) -> list[dict[str, Any]]:
         return self._tables.setdefault(module, [])
+
+    def records(self, name: str) -> list[dict[str, Any]]:
+        """运行期流水表：送测申请、路由回执等。"""
+        return self._records.setdefault(name, [])
+
+    def reset(self) -> None:
+        """把示例数据和运行期流水一起恢复成初始状态，主要给测试使用。"""
+        self._tables = {
+            name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
+        }
+        self._records = {}
 
     def find(self, module: str, entry_id: int) -> dict[str, Any] | None:
         for row in self.rows(module):

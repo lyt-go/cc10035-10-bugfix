@@ -1,9 +1,12 @@
 """跨模块数据流统一接口：暴露9组数据流的操作端点。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Body, HTTPException, Query
 
 from app.services.cross_module import cross_service
+from app.services.msg_decode import MsgDecodeService
+
+msg_decode_service = MsgDecodeService()
 
 router = APIRouter(prefix="/api/cross", tags=["跨模块数据流"])
 
@@ -36,6 +39,84 @@ def flow2_decode_and_route(
 ):
     """报文解码后按路由规则分发到目标Topic。"""
     return cross_service.decode_and_route(raw_message, protocol_type, topic)
+
+
+# ---------- 解码预览 / 送测凭据 / 路由回执 ----------
+
+@router.post("/flow2/preview")
+def flow2_preview(
+    rule_id: str = Query(..., description="解码规则编号"),
+    raw_hex: str = Query(..., description="原始报文hex"),
+):
+    """解码页预览：按当前规则解析，并列出同一段字节的所有合法解释。"""
+    return msg_decode_service.preview(rule_id, raw_hex)
+
+
+@router.post("/flow2/confirm")
+def flow2_confirm(
+    rule_id: str = Query(..., description="解码规则编号"),
+    raw_hex: str = Query(..., description="原始报文hex"),
+    data_type: str | None = Query(default=None, description="操作人确认的解释类型"),
+    topic: str = Query(default="", description="送测目标源Topic"),
+    expected_version: str | None = Query(default=None, description="确认时看到的规则版本"),
+):
+    """确认一份合法解释，生成送测凭据；规则在此期间变化则保留申请并标记冲突。"""
+    entry, message = msg_decode_service.confirm_submission(
+        rule_id, raw_hex, data_type=data_type, topic=topic, expected_version=expected_version,
+    )
+    return {"ok": entry is not None, "message": message, "submission": entry}
+
+
+@router.get("/flow2/submissions")
+def flow2_submissions():
+    """送测凭据列表（最新在前）。"""
+    return {"data": msg_decode_service.list_submissions()}
+
+
+@router.get("/flow2/submissions/{credential}")
+def flow2_submission_detail(credential: str):
+    """单份送测凭据详情：确认值、当前值、可用解释与冲突状态。"""
+    entry = msg_decode_service.get_submission(credential)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"送测凭据 {credential} 不存在")
+    return entry
+
+
+@router.post("/flow2/send")
+def flow2_send(
+    credential: str = Query(..., description="送测凭据编号"),
+    data_type: str | None = Query(default=None, description="按当前规则重新确认的解释类型"),
+):
+    """把已确认的解析结果交给路由服务，一份凭据最多产生一笔路由流水。"""
+    receipt, message = msg_decode_service.send_submission(credential, data_type=data_type)
+    return {
+        "ok": receipt is not None,
+        "message": message,
+        "receipt": receipt,
+        "submission": msg_decode_service.get_submission(credential),
+    }
+
+
+@router.get("/flow2/receipts")
+def flow2_receipts():
+    """路由回执列表（服务端流水）。"""
+    return {"data": msg_decode_service.list_receipts()}
+
+
+@router.get("/flow2/receipts/{credential}")
+def flow2_receipt_detail(credential: str):
+    """路由详情页的服务端回执。"""
+    receipt = msg_decode_service.get_receipt(credential)
+    if receipt is None:
+        raise HTTPException(status_code=404, detail=f"凭据 {credential} 还没有路由回执")
+    return receipt
+
+
+@router.patch("/flow2/rules/{rule_id}")
+def flow2_update_rule(rule_id: str, values: dict = Body(default_factory=dict)):
+    """修改解码规则解析参数（模拟另一窗口把 int32 改成 uint32）。"""
+    entry, message = msg_decode_service.update_rule(rule_id, values or {})
+    return {"ok": entry is not None, "message": message, "rule": entry}
 
 
 # ==================== Flow 3: 时序测点与存储策略 ====================

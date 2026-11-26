@@ -87,6 +87,56 @@ class MsgRouterService(BaseModuleService):
                 return False
         return len(source_parts) == len(pattern_parts)
 
+    def route_decoded(self, source_topic: str, decoded: dict[str, Any]) -> dict[str, Any]:
+        """把已经解码好的字段交给路由规则，返回实际转发计划和目标Topic。
+
+        解码页确认过的解析结果原样传进来，路由层不再自己解析报文，
+        也不允许把字段重新拼回十六进制文本。
+        """
+        matches = self.match_topics(source_topic)
+        if not matches:
+            return {"ok": False, "message": f"Topic {source_topic} 无匹配路由规则"}
+
+        payload = {
+            "value": decoded.get("value"),
+            "data_type": decoded.get("data_type"),
+            "byte_order": decoded.get("byte_order"),
+            "origin": "confirmed_decode",
+        }
+        plans = []
+        for rule in matches:
+            filter_expr = rule.get("过滤表达式", "")
+            passed = True
+            if filter_expr:
+                try:
+                    passed = bool(eval(filter_expr, {"__builtins__": {}}, {"payload": payload}))
+                except Exception:
+                    passed = True
+            if passed:
+                plans.append({
+                    "规则编号": rule["规则编号"],
+                    "目标Topic": rule["目标Topic"],
+                    "转发方式": rule["转发方式"],
+                    "优先级": rule.get("优先级"),
+                })
+
+        if not plans:
+            return {
+                "ok": False,
+                "message": f"Topic {source_topic} 匹配到路由规则但均被过滤条件拦截",
+                "matched": matches,
+            }
+
+        return {
+            "ok": True,
+            "message": f"消息已按解码结果路由到 {plans[0]['目标Topic']}",
+            "source_topic": source_topic,
+            "payload": payload,
+            "plans": plans,
+            "chosen": plans[0],
+            "route_time": _now(),
+        }
+
     def route_message(self, source_topic: str, payload: dict[str, Any]) -> dict[str, Any]:
         """对消息进行路由分发：匹配所有规则并输出转发计划。
 

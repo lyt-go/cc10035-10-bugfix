@@ -132,16 +132,16 @@ class CrossModuleService:
 
         业务流程：
         1. 根据协议类型查找已启用的解码规则
-        2. 模拟解码（按分隔符切割报文）
+        2. 复用解码规则做二进制解析（int32 按有符号解释，不能退化成hex文本）
         3. 查找匹配的路由规则（按Topic匹配）
-        4. 模拟路由到目标Topic
+        4. 把解析出来的数值交给路由服务，返回转发计划
         """
-        decode_rows = store.rows("msg_decode")
-        router_rows = store.rows("msg_router")
+        from app.services.msg_decode import MsgDecodeService
+        from app.services.msg_router import MsgRouterService
 
-        # 步骤1：查找已启用的解码规则
+        decode_service = MsgDecodeService()
         matched_rules = [
-            row for row in decode_rows
+            row for row in store.rows("msg_decode")
             if row.get("协议类型") == protocol_type
             and row.get("status") == "已启用"
         ]
@@ -151,46 +151,42 @@ class CrossModuleService:
                 "message": f"未找到协议 {protocol_type} 的已启用解码规则",
             }
 
-        # 步骤2：模拟报文解码
+        # 步骤2：按规则真实的偏移/长度/类型/字节序解码。
         rule = matched_rules[0]
-        separator = rule.get("报文标识", ",")
-        parts = raw_message.split(separator) if separator else [raw_message]
-        decoded_fields = {}
-        for i, part in enumerate(parts):
-            decoded_fields[f"field_{i}"] = part.strip()
-        decoded_fields["_decode_rule"] = rule.get("规则编号")
-        decoded_fields["_timestamp"] = _now()
+        parsed = decode_service.parse_entry(rule, raw_message)
+        if not parsed.get("ok"):
+            return {"ok": False, "message": parsed.get("message", "报文解析失败")}
 
-        # 步骤3：查找匹配的路由规则
-        matched_router = [
-            row for row in router_rows
-            if row.get("匹配Topic") == topic
-            and row.get("status") == "已启用"
-        ]
-        if not matched_router:
-            return {
-                "ok": False,
-                "message": f"Topic {topic} 没有匹配的已启用路由规则",
-            }
+        # 步骤3+4：路由服务消费解析结果，不再看原始字符串。
+        payload = {
+            "value": parsed["parsed_value"],
+            "data_type": parsed["data_type"],
+            "byte_order": parsed["byte_order"],
+        }
+        routed = MsgRouterService().route_decoded(topic, payload)
+        if not routed.get("ok"):
+            return {"ok": False, "message": routed.get("message", f"Topic {topic} 路由失败")}
 
-        router = matched_router[0]
-        target_topic = router.get("目标Topic", "")
-        router_id = router.get("规则编号")
-
-        # 步骤4：路由分发
+        chosen = routed["chosen"]
         result_entry = {
-            "router_id": router_id,
+            "router_id": chosen.get("规则编号"),
             "source_topic": topic,
-            "target_topic": target_topic,
-            "forward_method": router.get("转发方式", "direct"),
-            "decoded_fields": decoded_fields,
-            "raw_message": raw_message,
+            "target_topic": chosen.get("目标Topic"),
+            "forward_method": chosen.get("转发方式"),
+            "decode_rule": rule.get("规则编号"),
+            "rule_version": parsed.get("rule_version"),
+            "data_type": parsed.get("data_type"),
+            "byte_order": parsed.get("byte_order"),
+            "parsed_value": parsed.get("parsed_value"),
+            "field_hex": parsed.get("field_hex"),
+            "payload": payload,
+            "raw_message": parsed.get("raw_hex"),
             "route_time": _now(),
         }
 
         return {
             "ok": True,
-            "message": f"报文已解码并路由到 {target_topic}",
+            "message": f"报文已解码并路由到 {chosen.get('目标Topic')}",
             "result": result_entry,
         }
 

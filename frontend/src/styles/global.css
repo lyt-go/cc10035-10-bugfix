@@ -70,3 +70,41 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .analysis-chart { display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 12px 0; }
 .analysis-bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--brand); min-width: 24px; position: relative; transition: height 0.4s; }
 .analysis-bar span { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+/* 报文解码 · 送测确认面板 */
+.decode-panel { margin: 18px 0; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.decode-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.decode-head h3 { margin: 0; font-size: 15px; }
+.decode-version { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.decode-form, .decode-rule-editor { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.decode-form label, .decode-rule-editor label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.decode-form input, .decode-form select, .decode-rule-editor input, .decode-rule-editor select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; min-width: 150px; }
+.decode-rule-editor { border-top: 1px dashed var(--border); padding-top: 12px; }
+.decode-rule-editor .decode-label { align-self: center; }
+.decode-preview-card, .decode-credential, .decode-receipt, .decode-error-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.decode-preview-card { background: #fafbfc; }
+.decode-error-card { background: #fef3f2; border-color: #fda29b; color: #b42318; font-size: 13px; }
+.decode-preview-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.decode-label { font-size: 12px; color: var(--muted); }
+.decode-value { font-size: 24px; font-variant-numeric: tabular-nums; }
+.decode-type { font-size: 13px; color: #1f2937; }
+.decode-hex { font-family: monospace; font-size: 12px; color: var(--muted); }
+.decode-interpretations { display: flex; flex-direction: column; gap: 6px; }
+.decode-choice { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; background: #fff; }
+.decode-choice:has(input:checked) { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
+.decode-choice-value { font-family: monospace; font-size: 13px; }
+.decode-choice-meta { font-size: 12px; color: var(--muted); }
+.decode-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.decode-credential-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.decode-tag { font-size: 12px; border-radius: 999px; padding: 2px 10px; background: #eef2ff; color: #3538cd; }
+.decode-tag[data-status="版本冲突"] { background: #fef3f2; color: #b42318; }
+.decode-tag[data-status="已送测"] { background: #ecfdf3; color: #027a48; }
+.decode-grid { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
+.decode-grid dt { color: var(--muted); font-size: 12px; }
+.decode-grid dd { margin: 0; font-variant-numeric: tabular-nums; }
+.decode-conflict { background: #fffaeb; border: 1px solid #fedf89; border-radius: 6px; padding: 10px; color: #93370d; font-size: 13px; margin: 0; }
+.decode-issue { background: #fef3f2; border: 1px solid #fda29b; border-radius: 6px; padding: 10px; color: #b42318; font-size: 13px; margin: 0; }
+.decode-sent { color: #027a48; font-size: 13px; margin: 0; }
+.decode-receipt { background: #f8fafc; }
+.decode-info { font-size: 13px; color: #175cd3; margin: 0; }
+.receipt-panel { margin: 18px 0; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.receipt-value { font-family: monospace; }
